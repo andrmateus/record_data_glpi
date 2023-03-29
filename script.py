@@ -160,15 +160,13 @@ def delete_data_curdate_dev():
             FROM
                 computadores_ga
             WHERE 
-                computadores_ga.data_dados = CURDATE()
+                month(computadores_ga.data_dados) = month(CURDATE()) AND
+                year(computadores_ga.data_dados) = year(CURDATE())
         """
     
     mycursor.execute(sql)
-
     mydb.commit()
-
     mycursor.close()
-
     mydb.close()
 
 def carga_db_dev(df):
@@ -199,27 +197,27 @@ def carga_db_dev(df):
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
 
     for x in df.index:
-        data_dados = df.at[x, 'data_dados']
-        hostname = df.at[x, 'hostname']
-        status = df.at[x, 'status']
-        localizacao = df.at[x, 'localizacao']
-        fabricante = df.at[x, 'fabricante']
-        numero_de_serie = df.at[x, 'numero_de_serie']
-        modelo = df.at[x, 'modelo']
-        usuario = df.at[x, 'usuario']
-        tipo = df.at[x, 'tipo']
-        sistema_operacional = df.at[x, 'sistema_operacional']
-        fusion_ultimo_contato = df.at[x, 'fusion_ultimo_contato']
-        fusion_ultimo_contato = fusion_ultimo_contato if not pd.isnull(fusion_ultimo_contato) and str(fusion_ultimo_contato) != 'NaT' else None
-        fusion_ultimo_inventario = df.at[x, 'fusion_ultimo_inventario']
-        fusion_ultimo_inventario = fusion_ultimo_inventario if not pd.isnull(fusion_ultimo_inventario) and str(fusion_ultimo_inventario) != 'NaT' else None
-        processador = df.at[x, 'processador']
-        memoria = df.at[x, 'memoria']
-        garantia_inicio = df.at[x, 'garantia_inicio']
-        garantia_fim = df.at[x, 'garantia_fim']
-        id_glpi = df.at[x, 'id_glpi']
-        fornecedor = df.at[x, 'fornecedor']
-        patrimonio = df.at[x, 'patrimonio']
+        data_dados = str(df['data_dados'][x]) if df['data_dados'][x] != None else None
+        hostname = str(df['hostname'][x]) if df['hostname'][x] != None else None
+        status = str(df['status'][x]) if df['status'][x] != None else None
+        localizacao = str(df['localizacao'][x]) if df['localizacao'][x] != None else None
+        fabricante = str(df['fabricante'][x]) if df['fabricante'][x] != None else None
+        numero_de_serie = str(df['numero_de_serie'][x]) if df['numero_de_serie'][x] != None else None
+        modelo = str(df['modelo'][x]) if df['modelo'][x] != None else None
+        usuario = str(df['usuario'][x]) if df['usuario'][x] != None else None
+        tipo = str(df['tipo'][x]) if df['tipo'][x] != None else None
+        sistema_operacional = str(df['sistema_operacional'][x]) if df['sistema_operacional'][x] != None else None
+        fusion_ultimo_contato = str(df['fusion_ultimo_contato'][x]) if df['fusion_ultimo_contato'][x] != None else None
+        fusion_ultimo_contato = fusion_ultimo_contato if str(fusion_ultimo_contato) != 'NaT' else None
+        fusion_ultimo_inventario = str(df['fusion_ultimo_inventario'][x]) if df['fusion_ultimo_inventario'][x] != None else None
+        fusion_ultimo_inventario = fusion_ultimo_inventario if str(fusion_ultimo_inventario) != 'NaT' else None
+        processador = str(df['processador'][x]) if df['processador'][x] != None else None
+        memoria = str(df['memoria'][x]) if df['memoria'][x] != None else None
+        garantia_inicio = str(df['garantia_inicio'][x]) if df['garantia_inicio'][x] != None else None
+        garantia_fim = str(df['garantia_fim'][x]) if df['garantia_fim'][x] != None else None
+        id_glpi = str(df['id_glpi'][x]) if df['id_glpi'][x] != None else None
+        fornecedor = str(df['fornecedor'][x]) if df['fornecedor'][x] != None else None
+        patrimonio = str(df['patrimonio'][x]) if df['patrimonio'][x] != None else None
 
         val = (data_dados,
             hostname,
@@ -250,7 +248,7 @@ def carga_db_dev(df):
 print('inicio')
 glpi = consultar_glpi()
 print('sucesso - coleta')
-delete_data_curdate_prod()
+delete_data_curdate_dev()
 print('Sucesso - remoção dados antigos')
 carga_db_dev(glpi)
 print('Sucesso - producao')
