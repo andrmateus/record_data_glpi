@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_db_connection():
+def get_db_connection_prod():
     mydb = mysql.connector.connect(
         host=os.getenv('GLPI_HOST'),
         user=os.getenv('GLPI_USER'),
@@ -25,9 +25,9 @@ def get_db_connection_dev():
 
     return mydb
 
-def consultar_glpi():
+def consult_computers_prod():
     try:
-        conn  = get_db_connection()
+        conn  = get_db_connection_prod()
         sql = """
                 SELECT
                     CURDATE() AS 'data_dados',
@@ -150,26 +150,78 @@ def consultar_glpi():
     
     return df
 
-def delete_data_curdate_dev():
+def delete_computers_dev():
+    # get db connection
+    mydb = get_db_connection_dev()
+
+    # get cursor
+    mycursor = mydb.cursor()
+
+    try:
+        sql = """
+                    DELETE
+                    FROM
+                        computadores_ga
+                    WHERE 
+                        month(computadores_ga.data_dados) = month(CURDATE()) AND
+                        year(computadores_ga.data_dados) = year(CURDATE())
+                """
+        
+        # execute
+        mycursor.execute(sql)
+        mydb.commit()
+        mycursor.close()
+        mydb.close()
+    except Exception as e:
+        print(e)
+
+def delete_printers_dev():
     mydb = get_db_connection_dev()
 
     mycursor = mydb.cursor()
 
-    sql = """
-            DELETE
-            FROM
-                computadores_ga
-            WHERE 
-                month(computadores_ga.data_dados) = month(CURDATE()) AND
-                year(computadores_ga.data_dados) = year(CURDATE())
-        """
-    
-    mycursor.execute(sql)
-    mydb.commit()
-    mycursor.close()
-    mydb.close()
+    try:
+        sql = """
+                    DELETE
+                    FROM
+                        impressoras_ga
+                    WHERE 
+                        month(impressoras_ga.data_dados) = month(CURDATE()) AND
+                        year(impressoras_ga.data_dados) = year(CURDATE())
+                """
+        
+        # execute
+        mycursor.execute(sql)
+        mydb.commit()
+        mycursor.close()
+        mydb.close()
+    except Exception as e:
+        print(e)
 
-def carga_db_dev(df):
+def delete_phones_dev():
+    mydb = get_db_connection_dev()
+
+    mycursor = mydb.cursor()
+
+    try:
+        sql = """
+                    DELETE
+                    FROM
+                        telefones_ga
+                    WHERE 
+                        month(telefones_ga.data_dados) = month(CURDATE()) AND
+                        year(telefones_ga.data_dados) = year(CURDATE())
+                """
+        
+        # execute
+        mycursor.execute(sql)
+        mydb.commit()
+        mycursor.close()
+        mydb.close()
+    except Exception as e:
+        print(e)
+
+def update_computers_dev(df):
     mydb = get_db_connection_dev()
     mycursor = mydb.cursor()
 
@@ -245,12 +297,168 @@ def carga_db_dev(df):
     mydb.commit()
     mydb.close()
 
-print('inicio')
-glpi = consultar_glpi()
+def transfer_printers_data():
+    # Conectar no banco de origem
+    from_conn = get_db_connection_prod()
+
+    from_cursor = from_conn.cursor()
+
+    # Consulta SQL para recuperar os dados das impressoras do banco de origem
+    sql = """
+        SELECT
+            curdate() AS data_dados,
+            gp.name AS nome,
+            (
+                SELECT gpfp.fornecedordaimpressorafield 
+                FROM glpi_plugin_fields_printerprinters gpfp 
+                WHERE gpfp.items_id = gp.id
+            ) AS fornecedor, 
+            (
+                SELECT gpfp.funodaimpressorafield 
+                FROM glpi_plugin_fields_printerprinters gpfp 
+                WHERE gpfp.items_id = gp.id
+            ) AS funcao_impressora, 
+            gs.completename AS status, 
+            gm.name AS fabricante, 
+            gpm.name AS modelo, 
+            gl.completename AS localizacao, 
+            gpt.name AS tipo, 
+            gp.serial AS serie, 
+            gn.name AS rede,
+            (
+                SELECT gpfp.localdeinstalaofield 
+                FROM glpi_plugin_fields_printerprinters gpfp 
+                WHERE gpfp.items_id = gp.id
+            ) AS local_instalacao
+        FROM 
+            glpi_printers gp 
+            INNER JOIN glpi_printertypes gpt ON gpt.id = gp.printertypes_id 
+            INNER JOIN glpi_states gs ON gs.id = gp.states_id 
+            INNER JOIN glpi_manufacturers gm ON gm.id = gp.manufacturers_id 
+            INNER JOIN glpi_locations gl ON gl.id = gp.locations_id 
+            INNER JOIN glpi_printermodels gpm ON gpm.id = gp.printermodels_id 
+            INNER JOIN glpi_networks gn ON gn.id = gp.networks_id 
+        WHERE 
+            gp.is_deleted = 0
+    """
+
+    from_cursor.execute(sql)
+
+    # Conectar no banco de destino
+    to_conn = get_db_connection_dev()
+
+    to_cursor = to_conn.cursor()
+
+    # Inserir os dados no banco de destino
+    insert_sql = """
+        INSERT INTO impressoras_ga (
+            data_dados, 
+            nome, 
+            fornecedor, 
+            funcao_impressora, 
+            status, 
+            fabricante, 
+            modelo, 
+            localizacao, 
+            tipo, 
+            serie, 
+            rede,
+            local_instalacao
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+
+    for row in from_cursor:
+        to_cursor.execute(insert_sql, row)
+
+    to_conn.commit()
+
+    # Fechar as conexões
+    from_cursor.close()
+    from_conn.close()
+    to_cursor.close()
+    to_conn.close()
+
+def transfer_phones_data():
+    # Conectar no banco de origem
+    from_conn = get_db_connection_prod()
+
+    from_cursor = from_conn.cursor()
+
+    # Consulta SQL para recuperar os dados dos telefones do banco de origem
+    sql = """
+        SELECT
+            curdate() AS data_dados,
+            gp.name AS hostname,
+            gs.completename AS status,
+            gm.name AS fabricante,
+            gl.completename AS localizacao,
+            gpm.name AS modelo,
+            gpfp.ndalinhacomdddfield AS linha,
+            gu.name AS usuario,
+            gp.serial AS numero_de_serie,
+            gpt.name AS tipo,
+            gpfp.imeizeroonefield AS imei
+        FROM 
+            glpi_phones gp 
+            INNER JOIN glpi_plugin_fields_phonetelefones gpfp ON gpfp.items_id = gp.id
+            INNER JOIN glpi_users gu ON gu.id = gp.users_id
+            INNER JOIN glpi_phonetypes gpt ON gpt.id = gp.phonetypes_id
+            INNER JOIN glpi_states gs ON gs.id = gp.states_id
+            INNER JOIN glpi_manufacturers gm ON gm.id = gp.manufacturers_id
+            INNER JOIN glpi_locations gl ON gl.id = gp.locations_id
+            INNER JOIN glpi_phonemodels gpm ON gpm.id = gp.phonemodels_id
+        WHERE 
+            gp.is_deleted = 0
+    """
+
+    from_cursor.execute(sql)
+
+    # Conectar no banco de destino
+    to_conn = get_db_connection_dev()
+
+    to_cursor = to_conn.cursor()
+
+    # Inserir os dados no banco de destino
+    insert_sql = """
+        INSERT INTO telefones_ga (
+            data_dados,
+            hostname,
+            status,
+            fabricante,
+            localizacao,
+            modelo,
+            linha,
+            usuario,
+            numero_de_serie,
+            tipo,
+            imei
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+
+    for row in from_cursor:
+        to_cursor.execute(insert_sql, row)
+
+    to_conn.commit()
+
+    # Fechar as conexões
+    from_cursor.close()
+    from_conn.close()
+    to_cursor.close()
+    to_conn.close()
+
+
+print('Inicio - coleta')
+computersConsult = consult_computers_prod()
 print('sucesso - coleta')
-delete_data_curdate_dev()
+print('Inicio - remoção dados antigos')
+delete_computers_dev()
+delete_printers_dev()
+delete_phones_dev()
 print('Sucesso - remoção dados antigos')
-carga_db_dev(glpi)
-print('Sucesso - producao')
+print('Inicio - transferencia de dados')
+update_computers_dev(computersConsult)
+transfer_phones_data()
+transfer_printers_data()
+print('Sucesso - transferencia de dados')
 
 print('Done')
